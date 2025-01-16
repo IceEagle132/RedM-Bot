@@ -1,0 +1,23 @@
+{
+    "TOKEN": "yourtokenhere",
+    "ranches": [
+      {
+        "name": "Lockett Ranch",
+        "sourceChannelId": "1291647778979708938",
+        "targetChannelId": "1275611457463259208",
+        "payoutChannelId": "1304942988941725706",
+        "herdLogChannelId": "1275611505747951626",
+        "dataFile": "./playerStatsLockett.json",
+        "payoutFile": "./payoutsLockettRanch.json"
+      },
+      {
+        "name": "MILKY RANCH",
+        "sourceChannelId": "1318138788232433714",
+        "targetChannelId": "1318138587564474398",
+        "payoutChannelId": "1318138922756476938",
+        "herdLogChannelId": "1318138649325600798",
+        "dataFile": "./playerStatsMilky.json",
+        "payoutFile": "./payoutsMILKYRANCH.json"
+      }
+    ]
+  }
