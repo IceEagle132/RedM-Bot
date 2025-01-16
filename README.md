@@ -13,6 +13,13 @@ This bot was made for a Syn County Ranch
 - Payout and Wipe commands
 ---
 
+
+## Screenshots
+![image](https://github.com/user-attachments/assets/a65fb430-b900-43bb-b3ed-45ae2c1cf732)
+![image](https://github.com/user-attachments/assets/063462d8-0fac-44f0-b492-88f18308c393)
+
+
+
 ## Contributing
 
 Contributions are welcome! Feel free to submit pull requests to improve functionality or fix bugs.
