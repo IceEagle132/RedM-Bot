@@ -1,47 +1,39 @@
 const fs = require('fs');
-const { exec } = require('child_process');
+const { ranches } = require('../config.json');
 
 module.exports = {
   name: 'wipe',
-  description: 'Wipe the data files and restart the bot.',
+  description: 'Wipe the data files.',
   async execute(message) {
-    // Check if the user has administrative permissions
     if (!message.member.permissions.has('ADMINISTRATOR')) {
-      return message.reply('You do not have permission to use this command.');
+      return message.reply('You do not have permission to use this command.')
+        .then(msg => setTimeout(() => msg.delete(), 5000));
     }
 
-    // List of data files to wipe
-    const dataFiles = [
-      './playerStatsMilky.json',
-      './playerStatsLockett.json'
-    ];
-
     try {
-      // Wipe each data file
-      dataFiles.forEach(file => {
-        if (fs.existsSync(file)) {
-          fs.writeFileSync(file, '{}', 'utf8');
-          console.log(`Wiped data file: ${file}`);
+      ranches.forEach(ranch => {
+        if (fs.existsSync(ranch.dataFile)) {
+          fs.writeFileSync(ranch.dataFile, '{}', 'utf8');
+          console.log(`Wiped data file: ${ranch.dataFile}`);
         } else {
-          console.warn(`Data file not found: ${file}`);
+          console.warn(`Data file not found: ${ranch.dataFile}`);
+        }
+
+        if (ranch.playerStats) {
+          ranch.playerStats = {};
+          console.log(`Cleared in-memory stats for ranch: ${ranch.name}`);
         }
       });
 
-      // Notify the user
-      await message.reply('Data files wiped successfully. Restarting the bot...');
+      // Notify user and delete messages
+      message.reply('Data files wiped successfully.')
+        .then(msg => setTimeout(() => msg.delete(), 5000));
 
-      // Restart the bot
-      exec(`node "${process.argv[1]}"`, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Error restarting the bot: ${error.message}`);
-          return;
-        }
-        console.log(`Bot restarted successfully:\n${stdout}`);
-        process.exit(); // Exit the current process
-      });
+      setTimeout(() => message.delete(), 5000);
     } catch (error) {
-      console.error('An error occurred while wiping data files:', error);
-      message.reply('An error occurred while wiping data files. Check the logs for details.');
+      console.error('Error wiping data files:', error);
+      message.reply('An error occurred while wiping data files. Check logs.')
+        .then(msg => setTimeout(() => msg.delete(), 5000));
     }
   }
 };

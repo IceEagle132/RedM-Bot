@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const cron = require('node-cron');
 
 // Load config
 const config = require('./config.json');
@@ -11,12 +12,14 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers
   ],
 });
 
 // Load utility functions
 const { loadPlayerStats, savePlayerStats, updateEmbed } = require('./utils/stats');
+const payoutCommand = require('./commands/ranchPayout');
 
 // Command collection
 client.commands = new Collection();
@@ -29,6 +32,8 @@ for (const file of commandFiles) {
   client.commands.set(command.name, command);
   console.log(`Loaded command: ${command.name}`);
 }
+
+let cronTaskInitialized = false; // Flag to track if the cron task is already scheduled
 
 // On bot ready
 client.on('ready', async () => {
@@ -61,37 +66,111 @@ client.on('ready', async () => {
       console.error(`[${ranch.name}] Failed to fetch messages:`, err);
     }
   }
+
+  if (!cronTaskInitialized) {
+    // Schedule automated payouts for 7:55 AM on Wednesdays and Saturdays
+    cron.schedule('55 23 * * 2,5', async () => {
+      console.log('[Automated Payout] Starting payout process...');
+      try {
+        // Simulate a message object for the payout command
+        const fakeMessage = {
+          client,
+          reply: (msg) => console.log(`[Automated Payout] Reply: ${msg}`),
+        };
+    
+        await payoutCommand.execute(fakeMessage); // Run the payout logic once
+        console.log(`[Automated Payout] Completed.`);
+      } catch (error) {
+        console.error(`[Automated Payout] Error:`, error);
+      }
+    });    
+    console.log('[Automated Payout] Scheduler initialized.');
+    cronTaskInitialized = true; // Set the flag to prevent duplicate scheduling
+  }
+});
+
+// Role ID and Welcome Channel ID
+const WELCOME_ROLE_ID = '1310082837185167434';
+const WELCOME_CHANNEL_ID = '1330234206206300271';
+const RANCH_NAME = 'Milky';
+const RULES_CHANNEL_ID = '1318138310958518272';
+const RANCH_AVATAR_URL = 'https://i.imgur.com/PlixUY5.jpeg'; // Replace with the URL of your ranch avatar
+
+// Pool of random welcome messages
+const welcomeMessages = [
+  `🎉 Welcome ${RANCH_NAME}'s newest Ranch Hand, **{displayName}**! Saddle up and get ready for some ranching fun! Be sure to check out <#${RULES_CHANNEL_ID}> for the ranch rules.`,
+  `🤠 Howdy, **{displayName}**! Welcome to the ${RANCH_NAME} Ranch. Grab your boots and hat—time to get to work! Don’t forget to read <#${RULES_CHANNEL_ID}> for all the important rules.`,
+  `🌟 Yeehaw! **{displayName}** just joined the ${RANCH_NAME} Ranch. Welcome aboard, partner! Make sure you read <#${RULES_CHANNEL_ID}> to keep things running smoothly.`,
+  `🐄 Welcome to the herd, **{displayName}**! The ${RANCH_NAME} Ranch is lucky to have you. Please take a moment to read <#${RULES_CHANNEL_ID}> before starting.`,
+  `🌾 A big ranch welcome to **{displayName}**! Let's make ${RANCH_NAME} Ranch the best one out there! First things first—check out <#${RULES_CHANNEL_ID}> to learn the ranch rules.`,
+];
+
+client.on('guildMemberUpdate', (oldMember, newMember) => {
+  const oldRoles = oldMember.roles.cache;
+  const newRoles = newMember.roles.cache;
+
+  // Check if the welcome role was added
+  if (!oldRoles.has(WELCOME_ROLE_ID) && newRoles.has(WELCOME_ROLE_ID)) {
+    const welcomeChannel = newMember.guild.channels.cache.get(WELCOME_CHANNEL_ID);
+    if (welcomeChannel) {
+      // Use the member's display name (nickname or username)
+      const displayName = newMember.displayName;
+
+      // Choose a random welcome message
+      const randomMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)]
+        .replace(/{displayName}/gi, `**${displayName}**`); // Replace placeholder with bolded display name
+
+      // Create the embed
+      const embed = new EmbedBuilder()
+        .setColor(0x00ff00) // Green color
+        .setTitle(`🤠 Welcome to the ${RANCH_NAME} Ranch!`)
+        .setDescription(randomMessage)
+        .setThumbnail(RANCH_AVATAR_URL) // Use the ranch avatar as the thumbnail
+        .setTimestamp()
+        .setFooter({
+          text: 'Ranch Management System',
+          iconURL: client.user.displayAvatarURL(),
+        });
+
+      // Send the embed
+      welcomeChannel
+        .send({ embeds: [embed] })
+        .then(() => console.log(`[Welcome Message] Sent welcome embed for ${newMember.user.tag} in ${RANCH_NAME} Ranch`))
+        .catch((err) =>
+          console.error(`[Welcome Message] Failed to send embed for ${newMember.user.tag}:`, err)
+        );
+    } else {
+      console.error(`[Welcome Message] Welcome channel not found: ${WELCOME_CHANNEL_ID}`);
+    }
+  }
 });
 
 // On messageCreate
 client.on('messageCreate', async (message) => {
+  // Ignore bot messages
+  //if (message.author.bot) return; // ToDO Fix
+
   console.log(`Message received in channel ${message.channel.id}: "${message.content}"`);
 
-  // Handle !payout command globally
-  if (message.content.startsWith('!payout')) {
-    const command = client.commands.get('payout');
-    if (command) {
-      try {
-        await command.execute(message);
-      } catch (error) {
-        console.error('Error executing command:', error);
-        message.reply('There was an error while executing that command.');
-      }
-    }
-    return;
-  }
+  // Handle commands starting with "!"
+  if (message.content.startsWith('!')) {
+    const args = message.content.slice(1).trim().split(/ +/); // Remove "!" and split arguments
+    const commandName = args.shift().toLowerCase(); // Extract command name
 
-  // Handle !wipe command globally
-  if (message.content.startsWith('!wipe')) {
-    const command = client.commands.get('wipe');
-    if (command) {
-      try {
-        await command.execute(message);
-      } catch (error) {
-        console.error('Error executing command:', error);
-        message.reply('There was an error while executing that command.');
-      }
+    const command = client.commands.get(commandName);
+
+    if (!command) {
+      console.log(`Command !${commandName} not found.`);
+      return;
     }
+
+    try {
+      await command.execute(message, args); // Pass args to the command
+    } catch (error) {
+      console.error(`Error executing command !${commandName}:`, error);
+      message.reply('❌ There was an error while executing that command.');
+    }
+
     return;
   }
 
