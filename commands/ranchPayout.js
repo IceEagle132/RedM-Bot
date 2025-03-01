@@ -12,8 +12,10 @@ module.exports = {
 
   async execute(message) {
     if (activePayoutProcess) {
-      return message.reply('A payout process is already active. Please wait for it to complete.')
-        .then(msg => setTimeout(() => msg.delete(), 5000))
+      return message.channel.send('A payout process is already active. Please wait for it to complete.')
+        .then(msg => setTimeout(() => {
+          if (msg.deletable) msg.delete().catch(console.error);
+        }, 5000))
         .catch(console.error);
     }
     activePayoutProcess = true;
@@ -24,8 +26,10 @@ module.exports = {
         trackingPeriod = getCurrentTrackingPeriod();
       } catch (error) {
         console.error('Failed to calculate tracking period:', error.message);
-        return message.reply('An error occurred while calculating the tracking period.')
-          .then(msg => setTimeout(() => msg.delete(), 5000))
+        return message.channel.send('An error occurred while calculating the tracking period.')
+          .then(msg => setTimeout(() => {
+            if (msg.deletable) msg.delete().catch(console.error);
+          }, 5000))
           .catch(console.error);
       }
 
@@ -73,22 +77,38 @@ module.exports = {
         }
       }
 
-      await message.reply('Payouts processed. Data will be wiped in 10 seconds...')
-        .then(msg => setTimeout(() => msg.delete(), 5000))
+      const replyMsg = await message.channel.send('Payouts processed. Data will be wiped in 10 seconds...')
         .catch(console.error);
-      
+
+      if (replyMsg) {
+        setTimeout(() => {
+          if (replyMsg.deletable) replyMsg.delete().catch(console.error);
+        }, 5000);
+      }
+
       setTimeout(() => {
         wipeCommand.execute(message);
       }, 10000);
 
     } catch (error) {
       console.error('Payout process error:', error.message);
-      await message.reply('An error occurred while processing payouts. Check logs.')
-        .then(msg => setTimeout(() => msg.delete(), 5000))
+      const errorMsg = await message.channel.send('An error occurred while processing payouts. Check logs.')
         .catch(console.error);
+
+      if (errorMsg) {
+        setTimeout(() => {
+          if (errorMsg.deletable) errorMsg.delete().catch(console.error);
+        }, 5000);
+      }
     } finally {
       activePayoutProcess = false;
-      setTimeout(() => message.delete().catch(console.error), 5000);
+      setTimeout(() => {
+        if (message.deletable) {
+          message.delete().catch(error => {
+            if (error.code !== 10008) console.error("Failed to delete message:", error);
+          });
+        }
+      }, 5000);
     }
   },
 };

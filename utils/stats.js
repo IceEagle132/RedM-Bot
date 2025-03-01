@@ -93,7 +93,7 @@ async function updateEmbed(ranch, client) {
       targetMessage = await targetChannel.messages.fetch(ranch.embedMessageId).catch(() => null);
     }
 
-    // Get current tracking period
+    // Get tracking period
     const trackingPeriod = getCurrentTrackingPeriod();
 
     const embed = new EmbedBuilder()
@@ -103,38 +103,35 @@ async function updateEmbed(ranch, client) {
       .setTimestamp();
 
     const playerEntries = Object.entries(ranch.playerStats);
-
-    // Build fields for two-column layout
     const fields = [];
-    for (let i = 0; i < playerEntries.length; i++) {
-      const [playerMention, stats] = playerEntries[i];
-      const userId = playerMention.replace(/[<@!>]/g, ''); // Extract user ID from mention
-      const guild = targetChannel.guild;
+    let totalProfit = 0;
 
-      let displayName = playerMention; // Default to mention
-      if (guild) {
-        const member = await guild.members.fetch(userId).catch(() => null); // Fetch member by ID
-        displayName = member ? member.displayName : displayName; // Use nickname if available
+    // ✅ If there are no stats, reset embed
+    if (playerEntries.length === 0) {
+      embed.setDescription(`🥛 Tracking: ${trackingPeriod.start} - ${trackingPeriod.end} 🥚\n\nNo player stats available.`);
+      embed.setFooter({ text: `💰 Total Profit: $0.00` });
+    } else {
+      // ✅ Show each player's name, stats, and profit
+      for (const [playerMention, stats] of playerEntries) {
+        const userId = playerMention.replace(/[<@!>]/g, ''); // Extract user ID from mention
+        const guild = targetChannel.guild;
+
+        let displayName = playerMention; // Default to mention
+        if (guild) {
+          const member = await guild.members.fetch(userId).catch(() => null);
+          displayName = member ? member.displayName : playerMention; // Use nickname if available
+        }
+
+        const profit = (stats.milk * 1.25) + (stats.eggs * 1.25);
+        totalProfit += profit;
+
+        fields.push({
+          name: `${displayName}`, // ✅ Shows player's Discord nickname or mention
+          value: `🥛 Milk: ${stats.milk}\n🥚 Eggs: ${stats.eggs}\n💰 Profit: **$${profit.toFixed(2)}**`,
+          inline: true,
+        });
       }
 
-      const profit = (stats.milk * 1.25) + (stats.eggs * 1.25);
-      fields.push({
-        name: `${displayName}`, // Use nickname or mention
-        value: `🥛 Milk: ${stats.milk}\n🥚 Eggs: ${stats.eggs}\n💰 Profit: $${profit.toFixed(2)}`,
-        inline: true,
-      });
-    }
-
-    // Calculate total profit
-    const totalProfit = playerEntries.reduce(
-      (sum, [, stats]) => sum + stats.milk * 1.25 + stats.eggs * 1.25,
-      0
-    );
-
-    // Add fields and footer
-    if (fields.length === 0) {
-      embed.setDescription(`🥛 Tracking: ${trackingPeriod.start} - ${trackingPeriod.end} 🥚\nNo player stats available.`);
-    } else {
       embed.addFields(fields);
       embed.setFooter({ text: `💰 Total Profit: $${totalProfit.toFixed(2)}` });
     }
@@ -154,4 +151,4 @@ async function updateEmbed(ranch, client) {
   }
 }
 
-module.exports = { loadPlayerStats, savePlayerStats, updateEmbed };
+module.exports = { loadPlayerStats, savePlayerStats, updateEmbed, getCurrentTrackingPeriod };
